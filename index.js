@@ -35,7 +35,7 @@ async function check(p) {
     } else {const no=sold.find(x=>text.includes(x)),yes=buy.find(x=>text.includes(x));if(no){item.status='indisponível';item.reason=no;}else if(yes){item.status='disponível';item.reason=yes;}}
   } catch(e) {item.status='erro';item.reason=e.name==='TimeoutError'?'Tempo excedido':e.message;}
   item.confirmations=item.status==='disponível'?(prev.confirmations||0)+1:0; item.lastAlert=prev.lastAlert||null;
-  if(item.confirmations>=2 && (!item.lastAlert || Date.now()-Date.parse(item.lastAlert)>21600000)) {try{await telegram(item);item.alert='enviado';item.lastAlert=new Date().toISOString();}catch(e){item.alert='falhou';item.alertError=e.message;}}
+  if(item.confirmations>=1 && (!item.lastAlert || Date.now()-Date.parse(item.lastAlert)>21600000)) {try{await telegram(item);item.alert='enviado';item.lastAlert=new Date().toISOString();}catch(e){item.alert='falhou';item.alertError=e.message;}}
   state[p.id]=item;history.unshift(item);if(history.length>300)history.pop();
 }
 let busy=false;async function run(){if(busy)return;busy=true;try{for(const p of products)await check(p);}finally{busy=false;}}
