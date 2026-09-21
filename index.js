@@ -6,6 +6,7 @@ const TOKEN = process.env.DASHBOARD_TOKEN || 'zelda';
 const products = [
   {id:'console-amazon',name:'Console Zelda',store:'Amazon',url:'https://link.amazon/B0600ITmQ'},
   {id:'console-ml',name:'Console Zelda',store:'Mercado Livre',url:'https://descpromo.com/r/6sIOq9'},
+  {id:'console-shopee',name:'Console Zelda',store:'Shopee',url:'https://shopee.com.br/Console-Switch-2-The-Legend-Of-Zelda-%E2%80%93-40th-Anniversary-Edition-Nacional-i.498370128.58218265809?xptdk=14c1fb2d-2a06-40cd-981b-e5d6053f96f2'},
   {id:'pro-amazon',name:'Controle Pro Zelda',store:'Amazon',url:'https://link.amazon/B03Y06bTZ'},
   {id:'pro-ml',name:'Controle Pro Zelda',store:'Mercado Livre',url:'https://descpromo.com/r/Ah6bFY'}
 ];
@@ -26,9 +27,12 @@ async function check(p) {
   let item = {...p,checkedAt:new Date().toISOString(),status:'incerto',reason:'Sem indicador confiável'};
   try {
     const r = await fetch(p.url,{redirect:'follow',headers:{'user-agent':'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/125 Mobile Safari/537.36','accept-language':'pt-BR,pt;q=0.9'},signal:AbortSignal.timeout(20000)});
-    const text = clean(await r.text()); item.finalUrl = r.url; item.http = r.status;
-    if (r.status===429 || /captcha|robot check|access denied|acesso negado/.test(text)) {item.status='bloqueado';item.reason='A loja bloqueou a consulta automática';}
-    else {const no=sold.find(x=>text.includes(x)),yes=buy.find(x=>text.includes(x));if(no){item.status='indisponível';item.reason=no;}else if(yes){item.status='disponível';item.reason=yes;}}
+    const html = await r.text(), text = clean(html); item.finalUrl = r.url; item.http = r.status;
+    if (r.status===429 || r.status===403 || /robot check|access denied|acesso negado/.test(text)) {item.status='bloqueado';item.reason='A loja bloqueou a consulta automática';}
+    else if (p.store==='Shopee') {
+      if (/\"abnormal_status\":\"sold_out\"|\"stock_display\":\"OUT OF STOCK\"/.test(html)) {item.status='indisponível';item.reason='Shopee informou: sem estoque';}
+      else if (/\"stock_display\":\"IN STOCK\"/.test(html) || (/\"abnormal_status\":null/.test(html) && /\"is_grayout\":false/.test(html) && /\"stock\":[1-9]\d*/.test(html))) {item.status='disponível';item.reason='Shopee informou: disponível';}
+    } else {const no=sold.find(x=>text.includes(x)),yes=buy.find(x=>text.includes(x));if(no){item.status='indisponível';item.reason=no;}else if(yes){item.status='disponível';item.reason=yes;}}
   } catch(e) {item.status='erro';item.reason=e.name==='TimeoutError'?'Tempo excedido':e.message;}
   item.confirmations=item.status==='disponível'?(prev.confirmations||0)+1:0; item.lastAlert=prev.lastAlert||null;
   if(item.confirmations>=2 && (!item.lastAlert || Date.now()-Date.parse(item.lastAlert)>21600000)) {try{await telegram(item);item.alert='enviado';item.lastAlert=new Date().toISOString();}catch(e){item.alert='falhou';item.alertError=e.message;}}
